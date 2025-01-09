@@ -1,0 +1,17 @@
+# Database migration pattern
+Migrate 1st
+-2025_01_09_062343_create_offices_table
+-2025_01_09_062328_create_ipcr_periods_table
+-2025_01_09_062313_create_employment_types_table
+-2025_01_09_062252_create_employee_classifications_table
+
+2nd
+-2025_01_09_063202_create_employees_table
+
+3rd
+-2014_10_12_000000_create_users_table
+
+4th
+-2025_01_09_063431_create_ipcrs_table
+
+Di nag nama migrate pag sabay gawa ng foreign keys
