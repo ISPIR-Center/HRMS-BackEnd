@@ -48,17 +48,7 @@ class IpcrController extends Controller
                     $query->select('id')->from('ipcr_periods')->where('active_flag', true);
                 })
                 ->first();
-
-                // $existingIpcr = Ipcr::where('employee_no', $request->employee_no)
-                // ->whereIn('ipcr_period_id', function ($query) use ($request) {
-                //     $query->select('id')->from('ipcr_periods')
-                //         ->where('active_flag', true)
-                //         ->where('ipcr_period_type', $request->ipcr_period_type)
-                //         ->where('ipcr_type', $request->ipcr_type); // Ensure both type and period type match
-                // })
-                // ->first();
-
-
+                
             if ($existingIpcr) {
                 return response()->json([
                     'success' => false,
@@ -140,82 +130,6 @@ class IpcrController extends Controller
 //             'message' => 'IPCR validated successfully.',
 //             'data' => $ipcr
 //         ], 200);
-
-//     } catch (\Exception $e) {
-//         return response()->json([
-//             'success' => false,
-//             'message' => 'Something went wrong.',
-//             'error' => $e->getMessage()
-//         ], 500);
-//     }
-// }
-
-
-// PARA SA PWEDE MAG SAVE NG IPCR SASAME PERIOD PERO MAGKAIBANG TYPE
-
-// public function store(Request $request)
-// {
-//     try {
-//         // Step 1: Validate the request
-//         $validator = Validator::make($request->all(), [
-//             'employee_no' => 'required|exists:employees,employee_no',
-//             'ipcr_type' => 'required|string|exists:ipcr_periods,ipcr_type',
-//             'numerical_rating' => 'required|numeric|min:0|max:5',
-//         ]);
-
-//         if ($validator->fails()) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Validation failed',
-//                 'errors' => $validator->errors()
-//             ], 422);
-//         }
-
-//         // Step 2: Find the active IPCR period for the selected type
-//         $ipcrPeriod = IpcrPeriod::where('active_flag', true)
-//             ->where('ipcr_type', $request->ipcr_type)
-//             ->first();
-
-//         if (!$ipcrPeriod) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'No active IPCR period found for the selected type.'
-//             ], 403);
-//         }
-
-//         // Step 3: Prevent duplicate submissions for the same period **AND same type**
-//         $existingIpcr = Ipcr::where('employee_no', $request->employee_no)
-//             ->where('ipcr_period_id', $ipcrPeriod->id) // Check only for this period
-//             ->where('ipcr_type', $request->ipcr_type) // Ensure same type
-//             ->first();
-
-//         if ($existingIpcr) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'You have already submitted an IPCR for this period and type.'
-//             ], 409);
-//         }
-
-//         // Step 4: Automatically determine adjectival rating based on numerical rating
-//         $adjectivalRating = $this->getAdjectivalRating($request->numerical_rating);
-
-//         $ipcr = Ipcr::create([
-//             'employee_no' => $request->employee_no,
-//             'ipcr_period_id' => $ipcrPeriod->id,
-//             'ipcr_type' => $request->ipcr_type, // Store the selected IPCR type
-//             'numerical_rating' => $request->numerical_rating,
-//             'adjectival_rating' => $adjectivalRating,
-//             'submitted_date' => now(), // Auto-fill submission date
-//             'validated_date' => null, // Admin will validate later
-//             'validated_by' => null, // Admin will validate later
-//             // 'submitted_by' => auth()->id(), // Uncomment when authentication is added
-//         ]);
-
-//         return response()->json([
-//             'success' => true,
-//             'message' => 'IPCR submitted successfully.',
-//             'data' => $ipcr
-//         ], 201);
 
 //     } catch (\Exception $e) {
 //         return response()->json([

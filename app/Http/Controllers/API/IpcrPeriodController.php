@@ -37,13 +37,6 @@ class IpcrPeriodController extends Controller
                 ], 409);
             }
 
-            // If active_flag is true, deactivate other active periods of the same type
-            // if ($validatedData['active_flag']) {
-            //     IpcrPeriod::where('active_flag', true)
-            //         ->where('ipcr_period_type', $validatedData['ipcr_period_type'])
-            //         ->update(['active_flag' => false]);
-            // }
-
             if ($validatedData['active_flag']) {
                 // Activate all periods with the same ipcr_period_type but different ipcr_type
                 IpcrPeriod::where('ipcr_period_type', $validatedData['ipcr_period_type'])
