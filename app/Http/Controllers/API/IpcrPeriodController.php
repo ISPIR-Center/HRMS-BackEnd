@@ -38,11 +38,9 @@ class IpcrPeriodController extends Controller
             }
 
             if ($validatedData['active_flag']) {
-                // Activate all periods with the same ipcr_period_type but different ipcr_type
                 IpcrPeriod::where('ipcr_period_type', $validatedData['ipcr_period_type'])
                     ->update(['active_flag' => true]);
             }
-            // Create new IPCR period
             $ipcrPeriod = IpcrPeriod::create($validatedData);
 
             return response()->json([

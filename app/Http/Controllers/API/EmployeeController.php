@@ -23,7 +23,6 @@ class EmployeeController extends Controller
     public function store(Request $request)
     {
         try {
-            // Validate incoming request
             $validatedData = $request->validate([
                 'employment_type_id' => 'required|exists:employment_types,id',
                 'classification_id' => 'required|exists:employee_classifications,id',
@@ -42,7 +41,6 @@ class EmployeeController extends Controller
                 'google_scholar_link' => 'nullable|url',
             ]);
 
-            // Create a new employee
             $employee = Employee::create($validatedData);
 
             return response()->json([

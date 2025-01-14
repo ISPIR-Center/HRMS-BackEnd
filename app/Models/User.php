@@ -3,18 +3,20 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+
 
 
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use  HasFactory, Notifiable;
-    // HasApiTokens,
-
+  
+    use HasApiTokens, HasFactory, Notifiable;
     /**
      * The attributes that are mass assignable.
      *
@@ -42,12 +44,15 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
-    protected function casts(): array
-    {
-        return [
-            'password' => 'hashed',
-        ];
-    }
+    // protected function casts(): array
+    // {
+    //     return [
+    //         'password' => 'hashed',
+    //     ];
+    // }
+    protected $casts = [
+        'password' => 'hashed',
+    ];
 
     public function employee()
     {
@@ -80,8 +85,15 @@ class User extends Authenticatable
         return $this->role === 'employee';
     }
 
-    public function setPasswordAttribute($value)
-    {
-        $this->attributes['password'] = bcrypt($value);
-    }
+    // public function setPasswordAttribute($value)
+    // {
+    //     // $this->attributes['password'] = bcrypt($value);
+    //     $this->attributes['password'] = Hash::make($value);
+    // }
+    // public function setPasswordAttribute($value)
+    // {
+    //     if (!Hash::needsRehash($value)) {
+    //         $this->attributes['password'] = Hash::make($value);
+    //     }
+    // }
 }

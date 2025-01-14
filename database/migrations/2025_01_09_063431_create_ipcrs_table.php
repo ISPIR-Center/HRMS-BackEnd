@@ -30,6 +30,9 @@ return new class extends Migration
             $table->string('adjectival_rating');
             $table->date('submitted_date');
             $table->date('validated_date')->nullable();
+            
+            $table->string('file_path')->nullable(); 
+            $table->enum('status', ['Pending', 'submitted', 'Rejected'])->default('Pending');
             $table->timestamps(); 
         });
     }
