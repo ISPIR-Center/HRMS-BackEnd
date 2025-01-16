@@ -2,86 +2,52 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\CreateAccount;
 use App\Http\Controllers\API\AuthController;
-use App\Http\Controllers\API\IpcrController;
-use App\Http\Controllers\API\EmployeeController;
+use App\Http\Controllers\API\CreateAccountsController;
 use App\Http\Controllers\API\IpcrPeriodController;
-use App\Http\Controllers\API\EmployeeAccountCreation;
-use App\Http\Controllers\API\IpcrSubmit;
+use App\Http\Controllers\API\EmployeeProfileController;
+use App\Http\Controllers\API\IpcrSubmission;
 
-Route::post('/create-account', [EmployeeAccountCreation::class, 'createAccount']);
+
+
 Route::post('/login', [AuthController::class, 'login']);
-
-
-Route::post('/ipcr', [IpcrController::class, 'store']);
+Route::post('/public-account/create', [CreateAccountsController::class, 'CreateAccount']);
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
-
-    Route::middleware('admin')->group(function () {
-        Route::post('/register', [CreateAccount::class, 'createAccount']);
-        Route::post('/employees', [EmployeeController::class, 'store']);
-        
-        Route::post('/ipcr-periods', [IpcrPeriodController::class, 'store']);
-        Route::post('/ipcr/admin', [IpcrController::class, 'storeAdmin']);
-
-        Route::get('/user', [AuthController::class, 'user']);
-    });
-
-
-    Route::middleware('employee')->group(function () {
-        Route::post('/ipcr/employee', [IpcrController::class, 'storeEmployee']);
-    });
-});
-
-       
-
-
-
-
-
-
-Route::prefix('public')->group(function () {
     
-    Route::post('/ipcr/admin', [IpcrSubmit::class, 'storeAdmin']);  // Admin submits IPCR for any employee
-    Route::post('/ipcr/employee', [IpcrSubmit::class, 'storeEmployee']);  // Employee submits IPCR for themselves
+    Route::post('/admin-account/create', [CreateAccountsController::class, 'AdminCreateAccount'])->middleware('admin');
+
+    Route::controller(EmployeeProfileController::class)->middleware('admin')->group(function () { 
+        Route::post('/profile/create', 'CreateProfile');
+        Route::get('/profile/list',  'ViewList');
+        Route::get('/profile/view/{employee_no}',  'ViewProfile');
+        Route::put('/profile/update/{employee_no}',  'UpdateProfile'); 
+        
+    });
+
+    Route::controller(EmployeeProfileController::class)->middleware('employee')->group(function () { 
+        Route::get('/employees/profile/view/{employee_no}',  'ViewProfile');
+        Route::put('/employees/profile/update/{employee_no}',  'UpdateEmployee');
+    });
+
+    
+    Route::controller(IpcrPeriodController::class)->middleware('admin')->group(function () { 
+        Route::post('/ipcr-periods/create', 'CreateIpcrPeriod');
+        Route::get('/ipcr-periods/viewlist', 'ListIpcrPeriod');
+        Route::get('/ipcr-periods/{id}', 'GetIpcrPeriod');
+        Route::delete('/ipcr-periods/{id}', 'DeleteIpcrPeriod');
+
+    });
+
+    Route::controller(IpcrSubmission::class)->group(function () { 
+        Route::post('/admin-ipcr/submit', 'AdminSubmit')->middleware('admin');
+        Route::put('/status-validation/update/{id}',  'IpcrStatusValidation')->middleware('admin');
+        Route::post('/employee-ipcr/submit',  'EmployeeIpcrSubmit')->middleware('employee');
+        Route::get('/ipcr-list/view',  'IpcrList');
+        
+    });
+
+
+    Route::post('/logout', [AuthController::class, 'logout']);
 });
 
-
-
-
-
-
-// FOR IPCRSUBMIT SEPERATE ROUTE
-// Route::middleware('auth:sanctum')->group(function () {
-//     Route::post('/logout', [AuthController::class, 'logout']);
-
-//     Route::middleware('admin')->group(function () {
-//         Route::post('/ipcr/admin', [IpcrController::class, 'storeAdmin']);  // Admin submits IPCR for any employee
-//     });
-
-//     Route::middleware('employee')->group(function () {
-//         Route::post('/ipcr/employee', [IpcrController::class, 'storeEmployee']);  // Employee submits IPCR for themselves
-//     });
-// });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// RoleBaseMiddleWare
-// Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
-//     Route::get('/admin-dashboard', [AdminController::class, 'index']);
-// });

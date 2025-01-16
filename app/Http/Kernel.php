@@ -73,7 +73,10 @@ class Kernel extends HttpKernel
         //Admin middleware
         'admin' => \App\Http\Middleware\AdminMiddleware::class,
         // Employee middleware
-        'employee' => \App\Http\Middleware\EmployeeMiddleware::class,
+        'employee' => \App\Http\Middleware\EmployeeMiddleware::class,   
+        // Role base middleware  pag maramihan na
+        // 'role' => \App\Http\Middleware\RoleBaseMiddleware::class,
+
     ];
 
     

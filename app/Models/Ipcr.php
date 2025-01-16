@@ -17,7 +17,9 @@ class Ipcr extends Model
         'submitted_by', 
         'validated_by',
         'submitted_date',
-        'validated_date'   
+        'validated_date',  
+        'file_path', 
+        'status'
     ];
 
     public function employee()

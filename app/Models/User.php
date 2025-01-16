@@ -3,7 +3,6 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -85,15 +84,9 @@ class User extends Authenticatable
         return $this->role === 'employee';
     }
 
-    // public function setPasswordAttribute($value)
-    // {
-    //     // $this->attributes['password'] = bcrypt($value);
-    //     $this->attributes['password'] = Hash::make($value);
-    // }
-    // public function setPasswordAttribute($value)
-    // {
-    //     if (!Hash::needsRehash($value)) {
-    //         $this->attributes['password'] = Hash::make($value);
-    //     }
-    // }
+    public function setRoleAttribute($value)
+    {
+        $this->attributes['role'] = strtolower($value);
+    }
+
 }

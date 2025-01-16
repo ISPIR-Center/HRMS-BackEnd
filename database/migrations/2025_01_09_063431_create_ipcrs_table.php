@@ -26,14 +26,14 @@ return new class extends Migration
             $table->unsignedBigInteger('validated_by')->nullable();
             $table->foreign('validated_by')->references('id')->on('users');
             
-            $table->decimal('numerical_rating', 3, 2); 
-            $table->string('adjectival_rating');
+            $table->float('numerical_rating', 3, 2)->nullable(); 
+            $table->string('adjectival_rating')->nullable();
             $table->date('submitted_date');
             $table->date('validated_date')->nullable();
             
             $table->string('file_path')->nullable(); 
-            $table->enum('status', ['Pending', 'submitted', 'Rejected'])->default('Pending');
-            $table->timestamps(); 
+            $table->string('status')->default('Pending');
+            // $table->timestamps(); 
         });
     }
 

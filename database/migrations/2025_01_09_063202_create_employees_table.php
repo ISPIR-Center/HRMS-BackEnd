@@ -24,10 +24,10 @@ return new class extends Migration
             $table->string('first_name');                    
             $table->string('middle_name')->nullable();       
             $table->string('last_name');                     
-            $table->string('email_address')->unique();       
+            $table->string('email_address')->unique()->nullable();       
             $table->string('mobile_no')->nullable();         
             $table->date('birthdate')->nullable();
-            $table->enum('gender', ['Male', 'Female'])->nullable();
+            $table->string('gender')->nullable();
             $table->string('google_scholar_link')->nullable();
 
             $table->timestamps();
