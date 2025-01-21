@@ -13,7 +13,7 @@ class Office extends Model
         'office_name',
     ];
 
-    public function employees()
+    public function employee()
     {
         return $this->hasMany(Employee::class, 'office_id');
     }

@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 
 
@@ -19,12 +20,19 @@ class IpcrSubmission extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'employee_no' => 'required|exists:employees,employee_no',
-                'ipcr_type' => 'required|string|exists:ipcr_periods,ipcr_type',
+                'ipcr_period_type' => 'required|string|exists:ipcr_periods,ipcr_period_type',
+                'ipcr_type' => [
+                    'required',
+                    'string',
+                    Rule::exists('ipcr_periods', 'ipcr_type')->where(function ($query) use ($request) {
+                        $query->where('ipcr_period_type', $request->ipcr_period_type)
+                              ->where('active_flag', true);
+                    })
+                ],
                 'numerical_rating' => $request->ipcr_type === 'Accomplished' ? 'required|numeric|min:0|max:5' : 'nullable|numeric|min:0|max:5',
-                // 'numerical_rating' => 'nullable|numeric|min:0|max:5',
                 'file' => 'nullable|file|mimes:pdf,docx,doc,jpeg,png|max:10240',
             ]);
-
+    
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
@@ -32,38 +40,59 @@ class IpcrSubmission extends Controller
                     'errors' => $validator->errors()
                 ], 422);
             }
-
+    
             $employee_no = $request->employee_no;
             $ipcrPeriod = IpcrPeriod::where('active_flag', true)
-                ->where('ipcr_period_type', 'Regular')  
-                ->where('start_month_year', '<=', now())  
+                ->where('ipcr_period_type', $request->ipcr_period_type)
+                ->where('start_month_year', '<=', now())
                 ->where('end_month_year', '>=', now())
-                ->where('ipcr_type', $request->ipcr_type) 
+                ->where('ipcr_type', $request->ipcr_type)
                 ->first();
-
+    
             if (!$ipcrPeriod) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No active IPCR period found for the selected type.'
                 ], 403);
             }
-
-            if (Ipcr::where('employee_no', $employee_no)->where('ipcr_period_id', $ipcrPeriod->id)->exists()) {
+    
+            $existingSubmission = Ipcr::where('employee_no', $employee_no)
+                ->whereHas('ipcrPeriod', function ($query) use ($request) {
+                    $query->where('ipcr_period_type', $request->ipcr_period_type)
+                          ->where('ipcr_type', $request->ipcr_type);
+                })
+                ->exists();
+    
+            if ($existingSubmission) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Employee has already submitted an IPCR for this period and type.'
+                    'message' => 'Employee has already submitted an IPCR for this period type and IPCR type.'
                 ], 409);
             }
-
+    
+            $existingTargetSubmission = Ipcr::where('employee_no', $employee_no)
+                ->whereHas('ipcrPeriod', function ($query) {
+                    $query->where('ipcr_type', 'Target');
+                })
+                ->exists();
+    
+            if ($existingTargetSubmission && $request->ipcr_type === 'Accomplished') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot submit Accomplished because a Target submission already exists in a different period type.'
+                ], 409);
+            }
+    
             $submittedByUser = User::where('employee_no', $request->user()->employee_no)->first();
             $submittedById = $submittedByUser ? $submittedByUser->id : null;
-
+    
             $adjectivalRating = null;
             if ($request->numerical_rating !== null) {
                 $adjectivalRating = $this->getAdjectivalRating($request->numerical_rating);
             }
-
+    
             $filePath = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : null;
+
             $ipcr = Ipcr::create([
                 'employee_no' => $employee_no,
                 'ipcr_period_id' => $ipcrPeriod->id,
@@ -71,6 +100,8 @@ class IpcrSubmission extends Controller
                 'adjectival_rating' => $adjectivalRating,
                 'submitted_date' => now(),
                 'submitted_by' => $submittedById,
+                'validated_by' => $submittedById,  
+                'validated_date' => now(),  
                 'file_path' => $filePath,
             ]);
             return response()->json([
@@ -87,53 +118,53 @@ class IpcrSubmission extends Controller
         }
     }
 
+
     public function EmployeeIpcrSubmit(Request $request)
     {
         try {
-           
             $validator = Validator::make($request->all(), [
                 'ipcr_period_type' => 'required|string|exists:ipcr_periods,ipcr_period_type',
                 'ipcr_type' => 'required|string|exists:ipcr_periods,ipcr_type',
                 'numerical_rating' => $request->ipcr_type === 'Accomplished' ? 'required|numeric|min:0|max:5' : 'nullable|numeric|min:0|max:5',
-                // 'numerical_rating' => 'nullable|numeric|min:0|max:5',  
                 'file' => 'nullable|file|mimes:pdf,docx,doc,jpeg,png|max:10240',
             ]);
-
+    
             if ($validator->fails()) {
                 return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
             }
-
-            $user = auth()->user(); 
-            $employee_no = $user->employee_no; 
-
-           
+    
+            $user = auth()->user();
+            $employee_no = $user->employee_no;
+    
             $ipcrPeriod = IpcrPeriod::where('active_flag', true)
-                ->where('ipcr_period_type', $request->ipcr_period_type)  
-                ->where('ipcr_type', $request->ipcr_type)  
-                ->where('start_month_year', '<=', now())  
-                ->where('end_month_year', '>=', now())  
+                ->where('ipcr_period_type', $request->ipcr_period_type)
+                ->where('ipcr_type', $request->ipcr_type)
+                ->where('start_month_year', '<=', now())
+                ->where('end_month_year', '>=', now())
                 ->first();
-
+    
             if (!$ipcrPeriod) {
                 return response()->json(['success' => false, 'message' => 'No active IPCR period found for the selected type.'], 403);
             }
-
+    
             $existingSubmission = Ipcr::where('employee_no', $employee_no)
                 ->where('ipcr_period_id', $ipcrPeriod->id)
                 ->exists();
-
+    
             if ($existingSubmission) {
                 $ipcr = Ipcr::where('employee_no', $employee_no)
                     ->where('ipcr_period_id', $ipcrPeriod->id)
                     ->first();
                 $ipcr->numerical_rating = $request->numerical_rating;
                 $ipcr->adjectival_rating = $this->getAdjectivalRating($request->numerical_rating);
-                $ipcr->file_path = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : $ipcr->file_path; 
+                $ipcr->file_path = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : $ipcr->file_path;
                 $ipcr->submitted_date = now();
-                $ipcr->save(); 
+                $ipcr->save();
             } else {
-                $adjectivalRating = $this->getAdjectivalRating($request->numerical_rating);  
-                $filePath = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : null; 
+                $adjectivalRating = $this->getAdjectivalRating($request->numerical_rating);
+
+                $filePath = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : null;
+
                 $ipcr = Ipcr::create([
                     'employee_no' => $employee_no,
                     'ipcr_period_id' => $ipcrPeriod->id,
@@ -144,15 +175,15 @@ class IpcrSubmission extends Controller
                     'file_path' => $filePath,
                 ]);
             }
-
+    
             return response()->json(['success' => true, 'message' => 'IPCR submitted successfully.', 'data' => $ipcr], 201);
-
+    
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Something went wrong.', 'error' => $e->getMessage()], 500);
         }
     }
 
-     private function getAdjectivalRating($rating)
+    private function getAdjectivalRating($rating)
      {
          if ($rating >= 4.5) return 'Outstanding';
          if ($rating >= 3.5) return 'Very Satisfactory';
@@ -162,9 +193,8 @@ class IpcrSubmission extends Controller
      }
 
 
-
-     public function IpcrList(Request $request)
-     {
+    public function IpcrList(Request $request)
+    {
          try {
              $user = Auth::user();
  
@@ -179,26 +209,27 @@ class IpcrSubmission extends Controller
 
              $formattedIpcrs = $ipcrs->map(function ($ipcr) {
                 return [
+               
                     'id' => $ipcr->id,
                     'employee_no' => $ipcr->employee_no,
-                    'employee_name' => optional($ipcr->employee) ? $ipcr->employee->first_name . ' ' . $ipcr->employee->last_name : 'Unknown',
+                    'employee_name' => optional($ipcr->employee, fn($e) => $e->first_name . ' ' . $e->last_name) ?? 'Null',
+                    // 'employee_name' => optional($ipcr->employee) ? $ipcr->employee->first_name . ' ' . $ipcr->employee->last_name : 'N/A',
+                    'numerical_rating' => $ipcr->numerical_rating,
+                    'adjectival_rating' => $ipcr->adjectival_rating,
+                    'submitted_date' => $ipcr->submitted_date,
+                    // classes from model submittedBy validatedBy
+                    // 'submitted_by' => optional($ipcr->submittedBy?->employee)->first_name ?? 'N/A',
+                    'submitted_by' => optional($ipcr->submittedBy)->employee_no ?? 'N/A',
+                    'validated_by' => optional($ipcr->validatedBy)->employee_no ?? 'N/A',
+                    'file_path' => $ipcr->file_path,
+                    'status' => $ipcr->status,
                     'ipcr_period' => [
                         'type' => optional($ipcr->period)->ipcr_type,
                         'start_date' => optional($ipcr->period)->start_month_year,
                         'end_date' => optional($ipcr->period)->end_month_year,
                     ],
-                    'numerical_rating' => $ipcr->numerical_rating,
-                    'adjectival_rating' => $ipcr->adjectival_rating,
-                    'submitted_date' => $ipcr->submitted_date,
-                    // classes from model submittedBy validatedBy
-                    // 'submitted_by' => optional($ipcr->submittedBy->employee)->first_name ?? 'N/A',
-                    'submitted_by' => optional($ipcr->submittedBy)->employee_no ?? 'N/A',
-                    'validated_by' => optional($ipcr->validatedBy)->employee_no ?? 'N/A',
-                    'file_path' => $ipcr->file_path,
-                    'status' => $ipcr->status,
                 ];
             });
-
              return response()->json([
                  'success' => true,
                  'message' => 'IPCR records retrieved successfully.',
@@ -212,35 +243,48 @@ class IpcrSubmission extends Controller
                  'error' => $e->getMessage()
              ], 500);
          }
-     }
+    }
 
-    public function IpcrStatusValidation(Request $request, $id)
+
+    public function GetIpcr($id)
     {
         try {
-            $user = Auth::user();
+            $ipcr = Ipcr::findOrFail($id);
 
-            if ($user->role !== 'admin') {
+            return response()->json([
+                'success' => true,
+                'data' => $ipcr
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'IPCR record not found.',
+                'error' => $e->getMessage()
+            ], 404);
+        }
+    }
+
+    public function ValidatedSubmission(Request $request, $id)
+    {
+        try {
+            $ipcr = Ipcr::findOrFail($id);
+
+            if ($ipcr->status === 'Submitted') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Unauthorized access. Only admins can update IPCR records.'
-                ], 403);
+                    'message' => 'This IPCR has already been validated.'
+                ], 400);
             }
-            $request->validate([
-                'status' => 'required|in:Pending,Submitted' 
-            ]);
-
-            $ipcr = Ipcr::findOrFail($id);
-            $ipcr->status = $request->status;
-            $ipcr->validated_by = $user->id; 
-            $ipcr->validated_date = now(); 
+            $ipcr->status = 'Submitted';
+            $ipcr->validated_by = auth()->id();
+            $ipcr->validated_date = now();
             $ipcr->save();
 
             return response()->json([
                 'success' => true,
-                'message' => 'IPCR status updated successfully.',
+                'message' => 'IPCR validated successfully.',
                 'data' => $ipcr
             ], 200);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -250,8 +294,73 @@ class IpcrSubmission extends Controller
         }
     }
 
+    public function IpcrStatusValidation(Request $request, $id)
+    {
+        $ipcr = Ipcr::findOrFail($id);
+        try {
+            $request->validate([
+                'status' => 'required|in:Pending,Submitted',
+            ]);
+
+            $ipcr = Ipcr::findOrFail($id);
+            $ipcr->status = $request->status;
+            $ipcr->validated_by = auth()->id(); 
+            $ipcr->validated_date = now(); 
+            $ipcr->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Validated !',
+                'data' => $ipcr
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    public function DeleteIpcrRecord($id)
+    {
+        try {
+            $ipcr = Ipcr::findOrFail($id);
+            $ipcr->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Deleted !'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

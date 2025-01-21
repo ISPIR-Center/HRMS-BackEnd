@@ -14,17 +14,17 @@ return new class extends Migration
         Schema::create('ipcrs', function (Blueprint $table) {
             $table->id();
 
-            $table->string('employee_no');
-            $table->foreign('employee_no')->references('employee_no')->on('employees')->onDelete('cascade');
+            $table->string('employee_no')->nullable();
+            $table->foreign('employee_no')->references('employee_no')->on('employees')->onUpdate('cascade')->onDelete('set null');
 
             $table->unsignedBigInteger('ipcr_period_id')->nullable();
-            $table->foreign('ipcr_period_id')->references('id')->on('ipcr_periods')->onDelete('cascade');
+            $table->foreign('ipcr_period_id')->references('id')->on('ipcr_periods')->onUpdate('cascade')->onDelete('set null');
 
             $table->unsignedBigInteger('submitted_by')->nullable();
-            $table->foreign('submitted_by')->references('id')->on('users');
+            $table->foreign('submitted_by')->references('id')->on('users')->onUpdate('cascade')->onDelete('set null');
 
             $table->unsignedBigInteger('validated_by')->nullable();
-            $table->foreign('validated_by')->references('id')->on('users');
+            $table->foreign('validated_by')->references('id')->on('users')->onUpdate('cascade')->onDelete('set null');
             
             $table->float('numerical_rating', 3, 2)->nullable(); 
             $table->string('adjectival_rating')->nullable();
@@ -33,7 +33,7 @@ return new class extends Migration
             
             $table->string('file_path')->nullable(); 
             $table->string('status')->default('Pending');
-            // $table->timestamps(); 
+            $table->timestamps(); 
         });
     }
 

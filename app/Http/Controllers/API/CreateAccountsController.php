@@ -29,7 +29,7 @@ class CreateAccountsController extends Controller
                     'password' => 'required|string|min:8',
                     'first_name' => 'nullable|string|max:255',
                     'last_name' => 'nullable|string|max:255',
-                    'role' => 'nullable|string',
+                    'role' => 'nullable|string|in:employee,admin', 
                 ]);
 
                 if ($existingEmployee->email_address && $existingEmployee->email_address !== $request->email_address) {
@@ -45,7 +45,7 @@ class CreateAccountsController extends Controller
                     'last_name' => 'required|string|max:255',
                     'email_address' => 'required|email|unique:employees,email_address',
                     'password' => 'required|string|min:8',
-                    'role' => 'nullable|string',
+                    'role' => 'nullable|string|in:employee,admin', 
                 ]);
 
                 $existingEmployee = Employee::create([

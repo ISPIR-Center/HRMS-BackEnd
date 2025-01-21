@@ -2,13 +2,10 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Models\Office;
 use App\Models\Employee;
 use Illuminate\Http\Request;
-use App\Models\EmploymentType;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
-use App\Models\EmployeeClassification;
 use Illuminate\Validation\ValidationException;
 
 class EmployeeProfileController extends Controller
@@ -100,8 +97,15 @@ class EmployeeProfileController extends Controller
                 'birthdate' => 'nullable|date',
                 'gender' => 'nullable|in:Male,Female',
                 'google_scholar_link' => 'nullable|url',
+                'employee_no' => 'required|string|unique:employees,employee_no,' . $employee_no . ',employee_no',
             ]);
 
+            // Update employee_no if changed
+            if ($request->filled('employee_no') && $request->employee_no !== $employee_no) {
+                $employee->employee_no = $validatedData['employee_no'];
+            }
+
+            // Update related fields
             $employee->update($validatedData);
 
             if ($request->filled('employment_type_id')) {
@@ -114,18 +118,19 @@ class EmployeeProfileController extends Controller
                 $employee->office()->associate($request->office_id);
             }
 
-            $employee->save(); 
+            $employee->save();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Employee updated successfully',
-                'data' => $employee->load(['employmentType', 'classification', 'office'])
+                'data' => $employee->load(['employmentType', 'classification', 'office']),
             ], 200);
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'error' => 'Something went wrong',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -188,43 +193,6 @@ class EmployeeProfileController extends Controller
         }
     }
 
-
-    public function getEmployeeClassifications()
-    {
-        $classifications = EmployeeClassification::all();
-
-        return response()->json([
-            'success' => true,
-            'data' => $classifications,
-        ], 200);
-    }
-
-    public function getEmploymentTypes()
-    {
-        $employmentTypes = EmploymentType::all();
-
-        $types = $employmentTypes->map(function ($formatted) {
-            return [ 
-                'employment_type' => $formatted->employment_type,
-            ];
-        });
-
-        return response()->json([
-            'success' => true,
-            // 'data' => $employmentTypes,
-            'data' => $types,
-        ], 200);
-    }
-
-    public function getOffices()
-    {
-        $offices = Office::all();
-
-        return response()->json([
-            'success' => true,
-            'data' => $offices,
-        ], 200);
-    }
     
 }
 

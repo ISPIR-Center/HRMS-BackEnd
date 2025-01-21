@@ -46,7 +46,7 @@ class AuthController extends Controller
                 'success' => true,
                 'message' => 'Login successful.',
                 'token' => $token,
-                'expires_in' => now()->addHours(2)->timestamp,
+                // 'expires_in' => now()->addHours(2)->timestamp,
                 'user' => [
                     'id' => $user->id,
                     'employee_no' => $user->employee_no,

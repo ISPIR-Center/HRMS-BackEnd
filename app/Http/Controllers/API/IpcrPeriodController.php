@@ -16,7 +16,7 @@ class IpcrPeriodController extends Controller
                 'start_month_year' => 'required|date',
                 'end_month_year' => 'required|date|after_or_equal:start_month_year',
                 'ipcr_period_type' => 'required|string|max:255',
-                'ipcr_type' => 'required|string|max:255',
+                'ipcr_type' => 'required|string|in:Target,Accomplished',
             ]);
 
             $currentDate = now()->toDateString(); 

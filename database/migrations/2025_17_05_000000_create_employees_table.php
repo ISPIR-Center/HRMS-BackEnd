@@ -12,13 +12,13 @@ return new class extends Migration
             $table->string('employee_no')->primary();
 
             $table->unsignedBigInteger('employment_type_id')->nullable();
-            $table->foreign('employment_type_id')->references('id')->on('employment_types')->onDelete('cascade');
+            $table->foreign('employment_type_id')->references('id')->on('employment_types')->onUpdate('cascade')->onDelete('set null');
 
             $table->unsignedBigInteger('classification_id')->nullable();
-            $table->foreign('classification_id')->references('id')->on('employee_classifications')->onDelete('cascade');
+            $table->foreign('classification_id')->references('id')->on('employee_classifications')->onUpdate('cascade')->onDelete('set null');
 
             $table->unsignedBigInteger('office_id')->nullable();
-            $table->foreign('office_id')->references('id')->on('offices')->onDelete('cascade');
+            $table->foreign('office_id')->references('id')->on('offices')->onUpdate('cascade')->onDelete('set null');
 
             $table->string('suffix')->nullable();            
             $table->string('first_name');                    

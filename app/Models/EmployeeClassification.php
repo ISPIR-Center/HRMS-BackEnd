@@ -13,7 +13,7 @@ class EmployeeClassification extends Model
         'classification',
     ];
 
-    public function employees()
+    public function employee()
     {
         return $this->hasMany(Employee::class, 'classification_id');
     }
