@@ -32,7 +32,7 @@ return new class extends Migration
             $table->date('validated_date')->nullable();
             
             $table->string('file_path')->nullable(); 
-            $table->string('status')->default('Pending');
+            $table->string('status');
             $table->timestamps(); 
         });
     }

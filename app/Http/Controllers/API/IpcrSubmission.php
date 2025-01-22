@@ -91,7 +91,8 @@ class IpcrSubmission extends Controller
             }
 
             $filePath = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : null;
-
+            $status = $request->status ?? 'Pending';
+            
             $ipcr = Ipcr::create([
                 'employee_no' => $employee_no,
                 'ipcr_period_id' => $ipcrPeriod->id,
@@ -102,6 +103,8 @@ class IpcrSubmission extends Controller
                 'validated_by' => $submittedById,
                 'validated_date' => now(),
                 'file_path' => $filePath,
+                'status' => $status,
+                
             ]);
 
             return response()->json([
@@ -195,6 +198,7 @@ class IpcrSubmission extends Controller
                 'validated_by' => $user->id,  
                 'validated_date' => now(),
                 'file_path' => $filePath,
+                'status' => 'Pending',
             ]);
 
             return response()->json([

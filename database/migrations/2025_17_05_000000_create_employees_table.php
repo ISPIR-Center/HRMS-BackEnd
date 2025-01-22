@@ -9,6 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('employees', function (Blueprint $table) {
+            $table->id();
             $table->string('employee_no')->primary();
 
             $table->unsignedBigInteger('employment_type_id')->nullable();
@@ -24,7 +25,7 @@ return new class extends Migration
             $table->string('first_name');                    
             $table->string('middle_name')->nullable();       
             $table->string('last_name');                     
-            $table->string('email_address')->unique()->nullable();       
+            $table->string('email_address')->unique();       
             $table->string('mobile_no')->nullable();         
             $table->date('birthdate')->nullable();
             $table->string('gender')->nullable();

@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Http\Request;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\CreateAccountsController;
@@ -10,6 +12,9 @@ use App\Http\Controllers\API\EmployeeProfileController;
 use App\Http\Controllers\API\IpcrSubmission;
 
 
+// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+//     return $request->user();
+// });
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/public-account/create', [CreateAccountsController::class, 'CreateAccount']);

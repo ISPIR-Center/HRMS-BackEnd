@@ -14,11 +14,11 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             
-            $table->string('employee_no')->unique()->nullable();
+            $table->string('employee_no')->unique();
             $table->foreign('employee_no')->references('employee_no')->on('employees')->onUpdate('cascade')->onDelete('set null');
             // $table->enum('role', ['employee', 'admin'])->default('employee');
 
-            $table->string('role')->default('employee');
+            $table->string('role');
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
