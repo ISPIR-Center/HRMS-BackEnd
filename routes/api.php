@@ -22,6 +22,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/classification-type/dropdown',  'getEmployeeClassifications');
         Route::get('/employment-type/dropdown',  'getEmploymentTypes');
         Route::get('/offices/dropdown',  'getOffices');
+
+
+        Route::get('/ipcr-periods/active-flags/dropdown',  'getIpcrPeriods');
+        Route::post('/employee-names/autosuggestions/input-search',  'AutoSuggestEmployee')->middleware('admin');
     });
 
     Route::controller(EmployeeProfileController::class)->middleware('admin')->group(function () { 

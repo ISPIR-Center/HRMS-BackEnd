@@ -9,7 +9,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rule; 
 
 
 
@@ -20,19 +20,11 @@ class IpcrSubmission extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'employee_no' => 'required|exists:employees,employee_no',
-                'ipcr_period_type' => 'required|string|exists:ipcr_periods,ipcr_period_type',
-                'ipcr_type' => [
-                    'required',
-                    'string',
-                    Rule::exists('ipcr_periods', 'ipcr_type')->where(function ($query) use ($request) {
-                        $query->where('ipcr_period_type', $request->ipcr_period_type)
-                              ->where('active_flag', true);
-                    })
-                ],
+                'ipcr_period_id' => 'required|exists:ipcr_periods,id',
                 'numerical_rating' => $request->ipcr_type === 'Accomplished' ? 'required|numeric|min:0|max:5' : 'nullable|numeric|min:0|max:5',
                 'file' => 'nullable|file|mimes:pdf,docx,doc,jpeg,png|max:10240',
             ]);
-    
+
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
@@ -40,57 +32,63 @@ class IpcrSubmission extends Controller
                     'errors' => $validator->errors()
                 ], 422);
             }
-    
+
             $employee_no = $request->employee_no;
-            $ipcrPeriod = IpcrPeriod::where('active_flag', true)
-                ->where('ipcr_period_type', $request->ipcr_period_type)
-                ->where('start_month_year', '<=', now())
-                ->where('end_month_year', '>=', now())
-                ->where('ipcr_type', $request->ipcr_type)
-                ->first();
-    
-            if (!$ipcrPeriod) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No active IPCR period found for the selected type.'
-                ], 403);
-            }
-    
+            $ipcrPeriod = IpcrPeriod::find($request->ipcr_period_id);
+
             $existingSubmission = Ipcr::where('employee_no', $employee_no)
-                ->whereHas('ipcrPeriod', function ($query) use ($request) {
-                    $query->where('ipcr_period_type', $request->ipcr_period_type)
-                          ->where('ipcr_type', $request->ipcr_type);
+                ->whereHas('period', function ($query) use ($request) {
+                    $query->where('id', '!=', $request->ipcr_period_id)
+                        ->where('ipcr_period_type', '!=', IpcrPeriod::find($request->ipcr_period_id)->ipcr_period_type);
                 })
                 ->exists();
-    
+
             if ($existingSubmission) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Employee has already submitted an IPCR for this period type and IPCR type.'
+                    'message' => 'Employee has already submitted an IPCR for a different period type.'
                 ], 409);
             }
-    
-            $existingTargetSubmission = Ipcr::where('employee_no', $employee_no)
-                ->whereHas('ipcrPeriod', function ($query) {
-                    $query->where('ipcr_type', 'Target');
+
+            // If submitting "Accomplished", check if there is a "Target" submission in the same period type
+            if ($ipcrPeriod->ipcr_type === 'Accomplished') {
+                $existingTargetSubmission = Ipcr::where('employee_no', $employee_no)
+                    ->whereHas('period', function ($query) use ($ipcrPeriod) {
+                        $query->where('ipcr_period_type', $ipcrPeriod->ipcr_period_type) // Same period type
+                            ->where('ipcr_type', 'Target'); // Ensure Target type
+                    })
+                    ->exists();
+            
+                if (!$existingTargetSubmission) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cannot submit Accomplished because no Target submission exists for the same IPCR period type.'
+                    ], 409);
+                }
+            }
+
+            $duplicateSubmission = Ipcr::where('employee_no', $employee_no)
+                ->where('ipcr_period_id', $ipcrPeriod->id)
+                ->whereHas('period', function ($query) use ($ipcrPeriod) {
+                    $query->where('ipcr_type', $ipcrPeriod->ipcr_type); 
                 })
                 ->exists();
-    
-            if ($existingTargetSubmission && $request->ipcr_type === 'Accomplished') {
+
+            if ($duplicateSubmission) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Cannot submit Accomplished because a Target submission already exists in a different period type.'
+                    'message' => 'Employee has already submitted an IPCR for this period and type.'
                 ], 409);
             }
-    
+
             $submittedByUser = User::where('employee_no', $request->user()->employee_no)->first();
             $submittedById = $submittedByUser ? $submittedByUser->id : null;
-    
+
             $adjectivalRating = null;
             if ($request->numerical_rating !== null) {
                 $adjectivalRating = $this->getAdjectivalRating($request->numerical_rating);
             }
-    
+
             $filePath = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : null;
 
             $ipcr = Ipcr::create([
@@ -100,10 +98,11 @@ class IpcrSubmission extends Controller
                 'adjectival_rating' => $adjectivalRating,
                 'submitted_date' => now(),
                 'submitted_by' => $submittedById,
-                'validated_by' => $submittedById,  
-                'validated_date' => now(),  
+                'validated_by' => $submittedById,
+                'validated_date' => now(),
                 'file_path' => $filePath,
             ]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'IPCR submitted successfully.',
@@ -123,63 +122,92 @@ class IpcrSubmission extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'ipcr_period_type' => 'required|string|exists:ipcr_periods,ipcr_period_type',
-                'ipcr_type' => 'required|string|exists:ipcr_periods,ipcr_type',
+                'ipcr_period_id' => 'required|exists:ipcr_periods,id',
                 'numerical_rating' => $request->ipcr_type === 'Accomplished' ? 'required|numeric|min:0|max:5' : 'nullable|numeric|min:0|max:5',
                 'file' => 'nullable|file|mimes:pdf,docx,doc,jpeg,png|max:10240',
             ]);
-    
+
             if ($validator->fails()) {
-                return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
             }
-    
+
             $user = auth()->user();
             $employee_no = $user->employee_no;
-    
-            $ipcrPeriod = IpcrPeriod::where('active_flag', true)
-                ->where('ipcr_period_type', $request->ipcr_period_type)
-                ->where('ipcr_type', $request->ipcr_type)
-                ->where('start_month_year', '<=', now())
-                ->where('end_month_year', '>=', now())
-                ->first();
-    
+
+            $ipcrPeriod = IpcrPeriod::find($request->ipcr_period_id);
+
             if (!$ipcrPeriod) {
-                return response()->json(['success' => false, 'message' => 'No active IPCR period found for the selected type.'], 403);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid IPCR period.'
+                ], 404);
             }
-    
-            $existingSubmission = Ipcr::where('employee_no', $employee_no)
+
+            if ($ipcrPeriod->ipcr_type === 'Accomplished') {
+                $existingTargetSubmission = Ipcr::where('employee_no', $employee_no)
+                    ->whereHas('period', function ($query) use ($ipcrPeriod) {
+                        $query->where('ipcr_period_type', $ipcrPeriod->ipcr_period_type)
+                            ->where('ipcr_type', 'Target');
+                    })
+                    ->exists();
+
+                if (!$existingTargetSubmission) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cannot submit Accomplished because no Target submission exists for the same IPCR period type.'
+                    ], 409);
+                }
+            }
+
+            $duplicateSubmission = Ipcr::where('employee_no', $employee_no)
                 ->where('ipcr_period_id', $ipcrPeriod->id)
+                ->whereHas('period', function ($query) use ($ipcrPeriod) {
+                    $query->where('ipcr_type', $ipcrPeriod->ipcr_type);
+                })
                 ->exists();
-    
-            if ($existingSubmission) {
-                $ipcr = Ipcr::where('employee_no', $employee_no)
-                    ->where('ipcr_period_id', $ipcrPeriod->id)
-                    ->first();
-                $ipcr->numerical_rating = $request->numerical_rating;
-                $ipcr->adjectival_rating = $this->getAdjectivalRating($request->numerical_rating);
-                $ipcr->file_path = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : $ipcr->file_path;
-                $ipcr->submitted_date = now();
-                $ipcr->save();
-            } else {
-                $adjectivalRating = $this->getAdjectivalRating($request->numerical_rating);
 
-                $filePath = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : null;
-
-                $ipcr = Ipcr::create([
-                    'employee_no' => $employee_no,
-                    'ipcr_period_id' => $ipcrPeriod->id,
-                    'numerical_rating' => $request->numerical_rating,
-                    'adjectival_rating' => $adjectivalRating,
-                    'submitted_date' => now(),
-                    'submitted_by' => $user->id,
-                    'file_path' => $filePath,
-                ]);
+            if ($duplicateSubmission) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee has already submitted an IPCR for this period and type.'
+                ], 409);
             }
-    
-            return response()->json(['success' => true, 'message' => 'IPCR submitted successfully.', 'data' => $ipcr], 201);
-    
+
+            $adjectivalRating = null;
+            if ($request->numerical_rating !== null) {
+                $adjectivalRating = $this->getAdjectivalRating($request->numerical_rating);
+            }
+
+            $filePath = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : null;
+
+            $ipcr = Ipcr::create([
+                'employee_no' => $employee_no,
+                'ipcr_period_id' => $ipcrPeriod->id,
+                'numerical_rating' => $request->numerical_rating,
+                'adjectival_rating' => $adjectivalRating,
+                'submitted_date' => now(),
+                'submitted_by' => $user->id,
+                'validated_by' => $user->id,  
+                'validated_date' => now(),
+                'file_path' => $filePath,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'IPCR submitted successfully.',
+                'data' => $ipcr
+            ], 201);
+
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Something went wrong.', 'error' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong.',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -217,6 +245,7 @@ class IpcrSubmission extends Controller
                     'numerical_rating' => $ipcr->numerical_rating,
                     'adjectival_rating' => $ipcr->adjectival_rating,
                     'submitted_date' => $ipcr->submitted_date,
+                    'validated_date' => $ipcr->validated_date,
                     // classes from model submittedBy validatedBy
                     // 'submitted_by' => optional($ipcr->submittedBy?->employee)->first_name ?? 'N/A',
                     'submitted_by' => optional($ipcr->submittedBy)->employee_no ?? 'N/A',
@@ -365,14 +394,47 @@ class IpcrSubmission extends Controller
 
 
 
-// REPLACE not Prevent
-// public function storeAdmin(Request $request)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Treat 1st part as first name, last part as last name, and the rest as middle name
+// public function AdminSubmit(Request $request)
 // {
 //     try {
 //         $validator = Validator::make($request->all(), [
-//             'employee_no' => 'required|exists:employees,employee_no',
-//             'ipcr_type' => 'required|string|exists:ipcr_periods,ipcr_type',
-//             'numerical_rating' => 'required|numeric|min:0|max:5',
+//             'full_name' => 'required|string|max:255', // New field for full name
+//             'ipcr_period_id' => 'required|exists:ipcr_periods,id',
+//             'numerical_rating' => $request->ipcr_type === 'Accomplished' ? 'required|numeric|min:0|max:5' : 'nullable|numeric|min:0|max:5',
 //             'file' => 'nullable|file|mimes:pdf,docx,doc,jpeg,png|max:10240',
 //         ]);
 
@@ -384,165 +446,106 @@ class IpcrSubmission extends Controller
 //             ], 422);
 //         }
 
-//         $employee_no = $request->employee_no;
+//         // Split the full name into first and last name
+//         $nameParts = explode(' ', $request->full_name);
+//         $first_name = $nameParts[0];  // The first part is the first name
+//         $last_name = array_pop($nameParts); // The last part is the last name
+//         $middle_name = implode(' ', $nameParts); // Any remaining parts are treated as the middle name
 
-//         // Get active IPCR period for the same period type, allowing different ipcr_types
-//         $ipcrPeriod = IpcrPeriod::where('active_flag', true)
-//             ->where('ipcr_period_type', 'Regular')  
-//             ->where('start_month_year', '<=', now())
-//             ->where('end_month_year', '>=', now())
-//             ->where('ipcr_type', $request->ipcr_type) 
-//             ->first();
+//         // Find employee by first and last name
+//         $employee = Employee::where('first_name', $first_name)
+//                             ->where('last_name', $last_name)
+//                             ->first();
 
-//         if (!$ipcrPeriod) {
+//         if (!$employee) {
 //             return response()->json([
 //                 'success' => false,
-//                 'message' => 'No active IPCR period found for the selected type.'
-//             ], 403);
+//                 'message' => 'Employee not found.'
+//             ], 404);
 //         }
 
-//         // Check if the employee already submitted an IPCR for this period & type
-//         $existingIpcr = Ipcr::where('employee_no', $employee_no)
-//             ->where('ipcr_period_id', $ipcrPeriod->id)
-//             ->where('ipcr_type', $request->ipcr_type) // Ensure each type has its own record
-//             ->first();
+//         $employee_no = $employee->employee_no; // Get employee_no from the found employee
 
-//         // Handle file upload if present
-//         $filePath = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : null;
+//         $ipcrPeriod = IpcrPeriod::find($request->ipcr_period_id);
 
-//         if ($existingIpcr) {
-//             // Update existing IPCR
-//             $existingIpcr->numerical_rating = $request->numerical_rating;
-//             $existingIpcr->adjectival_rating = $this->getAdjectivalRating($request->numerical_rating);
-//             $existingIpcr->file_path = $filePath ?? $existingIpcr->file_path;
-//             $existingIpcr->submitted_date = now();
-//             $existingIpcr->submitted_by = $request->user()->id;
-
-//             $existingIpcr->save();
-
-//             return response()->json([
-//                 'success' => true,
-//                 'message' => 'IPCR updated successfully.',
-//                 'data' => $existingIpcr
-//             ], 200);
-//         } else {
-//             // Create new IPCR if none exists
-//             $submittedById = $request->user()->id;
-
-//             $ipcr = Ipcr::create([
-//                 'employee_no' => $employee_no,
-//                 'ipcr_period_id' => $ipcrPeriod->id,
-//                 'ipcr_type' => $request->ipcr_type, // Ensure type is stored
-//                 'numerical_rating' => $request->numerical_rating,
-//                 'adjectival_rating' => $this->getAdjectivalRating($request->numerical_rating),
-//                 'submitted_date' => now(),
-//                 'submitted_by' => $submittedById,
-//                 'file_path' => $filePath,
-//             ]);
-
-//             return response()->json([
-//                 'success' => true,
-//                 'message' => 'IPCR submitted successfully.',
-//                 'data' => $ipcr
-//             ], 201);
-//         }
-
-//     } catch (\Exception $e) {
-//         return response()->json([
-//             'success' => false,
-//             'message' => 'Something went wrong.',
-//             'error' => $e->getMessage()
-//         ], 500);
-//     }
-// }
-
-// public function storeAdmin(Request $request)
-// {
-//     try {
-//         $validator = Validator::make($request->all(), [
-//             'employee_no' => 'required|exists:employees,employee_no',
-//             'ipcr_type' => 'required|string|exists:ipcr_periods,ipcr_type',
-//             'numerical_rating' => 'required|numeric|min:0|max:5',
-//             'file' => 'nullable|file|mimes:pdf,docx,doc,jpeg,png|max:10240',
-//         ]);
-
-//         if ($validator->fails()) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Validation failed',
-//                 'errors' => $validator->errors()
-//             ], 422);
-//         }
-
-//         $employee_no = $request->employee_no;
-
-//         // Get active IPCR period for the same period type (allow different ipcr_type)
-//         $ipcrPeriod = IpcrPeriod::where('active_flag', true)
-//             ->where('ipcr_period_type', function ($query) use ($employee_no) {
-//                 // Fetch the period type of any existing record to match it
-//                 $existingIpcr = Ipcr::where('employee_no', $employee_no)->first();
-//                 if ($existingIpcr) {
-//                     $query->where('ipcr_period_type', $existingIpcr->ipcrPeriod->ipcr_period_type);
-//                 }
+//         // Check for existing submission in a different period type
+//         $existingSubmission = Ipcr::where('employee_no', $employee_no)
+//             ->whereHas('period', function ($query) use ($request) {
+//                 $query->where('id', '!=', $request->ipcr_period_id)
+//                     ->where('ipcr_period_type', '!=', IpcrPeriod::find($request->ipcr_period_id)->ipcr_period_type);
 //             })
-//             ->where('start_month_year', '<=', now())
-//             ->where('end_month_year', '>=', now())
-//             ->where('ipcr_type', $request->ipcr_type) 
-//             ->first();
+//             ->exists();
 
-//         if (!$ipcrPeriod) {
+//         if ($existingSubmission) {
 //             return response()->json([
 //                 'success' => false,
-//                 'message' => 'No active IPCR period found for the selected type.'
-//             ], 403);
+//                 'message' => 'Employee has already submitted an IPCR for a different period type.'
+//             ], 409);
 //         }
 
-//         // Check if an existing IPCR exists for this period & type
-//         $existingIpcr = Ipcr::where('employee_no', $employee_no)
-//             ->where('ipcr_period_id', $ipcrPeriod->id)
-//             ->where('ipcr_type', $request->ipcr_type) // Ensuring each type can have its own record
-//             ->first();
+//         // If submitting "Accomplished", check if there is a "Target" submission in the same period type
+//         if ($ipcrPeriod->ipcr_type === 'Accomplished') {
+//             $existingTargetSubmission = Ipcr::where('employee_no', $employee_no)
+//                 ->whereHas('period', function ($query) use ($ipcrPeriod) {
+//                     $query->where('ipcr_period_type', $ipcrPeriod->ipcr_period_type) // Same period type
+//                         ->where('ipcr_type', 'Target'); // Ensure Target type
+//                 })
+//                 ->exists();
 
-//         // Handle file upload
+//             if (!$existingTargetSubmission) {
+//                 return response()->json([
+//                     'success' => false,
+//                     'message' => 'Cannot submit Accomplished because no Target submission exists for the same IPCR period type.'
+//                 ], 409);
+//             }
+//         }
+
+//         // Check for duplicate submission
+//         $duplicateSubmission = Ipcr::where('employee_no', $employee_no)
+//             ->where('ipcr_period_id', $ipcrPeriod->id)
+//             ->whereHas('period', function ($query) use ($ipcrPeriod) {
+//                 $query->where('ipcr_type', $ipcrPeriod->ipcr_type);
+//             })
+//             ->exists();
+
+//         if ($duplicateSubmission) {
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Employee has already submitted an IPCR for this period and type.'
+//             ], 409);
+//         }
+
+//         // Get the user who is submitting the IPCR
+//         $submittedByUser = User::where('employee_no', $request->user()->employee_no)->first();
+//         $submittedById = $submittedByUser ? $submittedByUser->id : null;
+
+//         // Get the adjectival rating based on the numerical rating
+//         $adjectivalRating = null;
+//         if ($request->numerical_rating !== null) {
+//             $adjectivalRating = $this->getAdjectivalRating($request->numerical_rating);
+//         }
+
+//         // Store the uploaded file, if any
 //         $filePath = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : null;
 
-//         if ($existingIpcr) {
-//             // Update existing IPCR record
-//             $existingIpcr->numerical_rating = $request->numerical_rating;
-//             $existingIpcr->adjectival_rating = $this->getAdjectivalRating($request->numerical_rating);
-//             $existingIpcr->file_path = $filePath ?? $existingIpcr->file_path;
-//             $existingIpcr->submitted_date = now();
-//             $existingIpcr->submitted_by = $request->user()->id;
+//         // Create the IPCR submission
+//         $ipcr = Ipcr::create([
+//             'employee_no' => $employee_no,
+//             'ipcr_period_id' => $ipcrPeriod->id,
+//             'numerical_rating' => $request->numerical_rating,
+//             'adjectival_rating' => $adjectivalRating,
+//             'submitted_date' => now(),
+//             'submitted_by' => $submittedById,
+//             'validated_by' => $submittedById,
+//             'validated_date' => now(),
+//             'file_path' => $filePath,
+//         ]);
 
-//             $existingIpcr->save();
-
-//             return response()->json([
-//                 'success' => true,
-//                 'message' => 'IPCR updated successfully.',
-//                 'data' => $existingIpcr
-//             ], 200);
-//         } else {
-//             // Create a new IPCR record if it doesn't exist
-//             $submittedById = $request->user()->id;
-
-//             $ipcr = Ipcr::create([
-//                 'employee_no' => $employee_no,
-//                 'ipcr_period_id' => $ipcrPeriod->id,
-//                 'ipcr_type' => $request->ipcr_type, // Store type
-//                 'numerical_rating' => $request->numerical_rating,
-//                 'adjectival_rating' => $this->getAdjectivalRating($request->numerical_rating),
-//                 'submitted_date' => now(),
-//                 'submitted_by' => $submittedById,
-//                 'file_path' => $filePath,
-//             ]);
-
-//             return response()->json([
-//                 'success' => true,
-//                 'message' => 'IPCR submitted successfully.',
-//                 'data' => $ipcr
-//             ], 201);
-//         }
-
+//         return response()->json([
+//             'success' => true,
+//             'message' => 'IPCR submitted successfully.',
+//             'data' => $ipcr
+//         ], 201);
 //     } catch (\Exception $e) {
 //         return response()->json([
 //             'success' => false,
@@ -551,3 +554,140 @@ class IpcrSubmission extends Controller
 //         ], 500);
 //     }
 // }
+
+
+
+// SUBMITTING BY NAME
+// public function AdminSubmit(Request $request)
+//     {
+//         try {
+//             $validator = Validator::make($request->all(), [
+//                 'full_name' => 'required|string|max:255', // New field for full name
+//                 'ipcr_period_id' => 'required|exists:ipcr_periods,id',
+//                 'numerical_rating' => $request->ipcr_type === 'Accomplished' ? 'required|numeric|min:0|max:5' : 'nullable|numeric|min:0|max:5',
+//                 'file' => 'nullable|file|mimes:pdf,docx,doc,jpeg,png|max:10240',
+//             ]);
+
+//             if ($validator->fails()) {
+//                 return response()->json([
+//                     'success' => false,
+//                     'message' => 'Validation failed',
+//                     'errors' => $validator->errors()
+//                 ], 422);
+//             }
+
+//             // Split the full name into first and last name
+//             $nameParts = explode(' ', $request->full_name, 2);
+//             if (count($nameParts) < 2) {
+//                 return response()->json([
+//                     'success' => false,
+//                     'message' => 'Please provide both first name and last name.'
+//                 ], 422);
+//             }
+
+//             $first_name = $nameParts[0];
+//             $last_name = $nameParts[1];
+
+//             // Find employee by first and last name
+//             $employee = Employee::where('first_name', $first_name)
+//                                 ->where('last_name', $last_name)
+//                                 ->first();
+
+//             if (!$employee) {
+//                 return response()->json([
+//                     'success' => false,
+//                     'message' => 'Employee not found.'
+//                 ], 404);
+//             }
+
+//             $employee_no = $employee->employee_no; // Get employee_no from the found employee
+
+//             $ipcrPeriod = IpcrPeriod::find($request->ipcr_period_id);
+
+//             // Check for existing submission in a different period type
+//             $existingSubmission = Ipcr::where('employee_no', $employee_no)
+//                 ->whereHas('period', function ($query) use ($request) {
+//                     $query->where('id', '!=', $request->ipcr_period_id)
+//                         ->where('ipcr_period_type', '!=', IpcrPeriod::find($request->ipcr_period_id)->ipcr_period_type);
+//                 })
+//                 ->exists();
+
+//             if ($existingSubmission) {
+//                 return response()->json([
+//                     'success' => false,
+//                     'message' => 'Employee has already submitted an IPCR for a different period type.'
+//                 ], 409);
+//             }
+
+//             // If submitting "Accomplished", check if there is a "Target" submission in the same period type
+//             if ($ipcrPeriod->ipcr_type === 'Accomplished') {
+//                 $existingTargetSubmission = Ipcr::where('employee_no', $employee_no)
+//                     ->whereHas('period', function ($query) use ($ipcrPeriod) {
+//                         $query->where('ipcr_period_type', $ipcrPeriod->ipcr_period_type) // Same period type
+//                             ->where('ipcr_type', 'Target'); // Ensure Target type
+//                     })
+//                     ->exists();
+
+//                 if (!$existingTargetSubmission) {
+//                     return response()->json([
+//                         'success' => false,
+//                         'message' => 'Cannot submit Accomplished because no Target submission exists for the same IPCR period type.'
+//                     ], 409);
+//                 }
+//             }
+
+//             // Check for duplicate submission
+//             $duplicateSubmission = Ipcr::where('employee_no', $employee_no)
+//                 ->where('ipcr_period_id', $ipcrPeriod->id)
+//                 ->whereHas('period', function ($query) use ($ipcrPeriod) {
+//                     $query->where('ipcr_type', $ipcrPeriod->ipcr_type);
+//                 })
+//                 ->exists();
+
+//             if ($duplicateSubmission) {
+//                 return response()->json([
+//                     'success' => false,
+//                     'message' => 'Employee has already submitted an IPCR for this period and type.'
+//                 ], 409);
+//             }
+
+//             // Get the user who is submitting the IPCR
+//             $submittedByUser = User::where('employee_no', $request->user()->employee_no)->first();
+//             $submittedById = $submittedByUser ? $submittedByUser->id : null;
+
+//             // Get the adjectival rating based on the numerical rating
+//             $adjectivalRating = null;
+//             if ($request->numerical_rating !== null) {
+//                 $adjectivalRating = $this->getAdjectivalRating($request->numerical_rating);
+//             }
+
+//             // Store the uploaded file, if any
+//             $filePath = $request->file('file') ? $request->file('file')->store('ipcr_files', 'public') : null;
+
+//             // Create the IPCR submission
+//             $ipcr = Ipcr::create([
+//                 'employee_no' => $employee_no,
+//                 'ipcr_period_id' => $ipcrPeriod->id,
+//                 'numerical_rating' => $request->numerical_rating,
+//                 'adjectival_rating' => $adjectivalRating,
+//                 'submitted_date' => now(),
+//                 'submitted_by' => $submittedById,
+//                 'validated_by' => $submittedById,
+//                 'validated_date' => now(),
+//                 'file_path' => $filePath,
+//             ]);
+
+//             return response()->json([
+//                 'success' => true,
+//                 'message' => 'IPCR submitted successfully.',
+//                 'data' => $ipcr
+//             ], 201);
+//         } catch (\Exception $e) {
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Something went wrong.',
+//                 'error' => $e->getMessage()
+//             ], 500);
+//         }
+//     }
+

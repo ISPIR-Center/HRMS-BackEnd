@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\API;
 
 use App\Models\Office;
+use App\Models\Employee;
+use App\Models\IpcrPeriod;
 use Illuminate\Http\Request;
 use App\Models\EmploymentType;
 use App\Http\Controllers\Controller;
@@ -62,4 +64,82 @@ class DetailsController extends Controller
             'data' => $formattedOffices,
         ], 200);
     }
+
+
+    public function getIpcrPeriods()
+    {
+        try {
+            $ipcrPeriods = IpcrPeriod::where('active_flag', true)
+                ->orderBy('start_month_year', 'desc')
+                ->get();
+
+            $formattedPeriods = $ipcrPeriods->map(function ($period) {
+                return [
+                    'id' => $period->id, 
+                    'name' => $period->ipcr_period_type . ' - ' . $period->ipcr_type,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $formattedPeriods
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    public function AutoSuggestEmployee(Request $request)
+    {
+        try {
+            $searchTerm = $request->input('search_name');
+            
+            $employees = Employee::where('first_name', 'like', "%{$searchTerm}%")
+                                ->orWhere('last_name', 'like', "%{$searchTerm}%")
+                                ->orWhere('middle_name', 'like', "%{$searchTerm}%")  
+                                ->orWhere('employee_no', 'like', "%{$searchTerm}%")
+                                ->select('employee_no','first_name', 'middle_name', 'last_name')
+                                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $employees
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
+
 }
+// public function AutoSuggestEmployee(Request $request)
+// {
+//     try {
+//         $searchTerm = $request->input('search_name');
+//         $employees = Employee::where('first_name', 'like', "%{$searchTerm}%")
+//                             ->orWhere('last_name', 'like', "%{$searchTerm}%")
+//                             ->select('first_name', 'last_name', 'employee_no')
+//                             ->get();
+
+//         return response()->json([
+//             'success' => true,
+//             'data' => $employees
+//         ]);
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'success' => false,
+//             'message' => 'Something went wrong.',
+//             'error' => $e->getMessage()
+//         ], 500);
+//     }
+// }
+

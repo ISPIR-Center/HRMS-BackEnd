@@ -38,4 +38,17 @@ class IpcrPeriod extends Model
     {
         return $this->hasMany(Ipcr::class, 'ipcr_period_id');
     }
+
+    public function scopeActive($query)
+    {
+        return $query->whereHas('period', function ($q) {
+            $q->where('active_flag', true);
+        });
+    }
+
+    // public static function activePeriods()
+    // {
+    //     return self::where('active_flag', true)->get();
+    // }
+
 }

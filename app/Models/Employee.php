@@ -48,4 +48,11 @@ class Employee extends Model
     {
         return $this->hasMany(Ipcr::class, 'employee_no', 'employee_no');
     }
+
+
+
+    public function setFirstNameAttribute($value)
+    {
+        $this->attributes['first_name'] = ucfirst($value);
+    }
 }

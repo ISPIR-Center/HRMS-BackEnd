@@ -27,8 +27,8 @@ class CreateAccountsController extends Controller
                 $validatedData = $request->validate([
                     'email_address' => 'required|email',
                     'password' => 'required|string|min:8',
-                    'first_name' => 'nullable|string|max:255',
-                    'last_name' => 'nullable|string|max:255',
+                    'first_name' => 'required|string|max:255',
+                    'last_name' => 'required|string|max:255',
                     'role' => 'nullable|string|in:employee,admin', 
                 ]);
 
@@ -101,8 +101,8 @@ class CreateAccountsController extends Controller
                 $validatedData = $request->validate([
                     'email_address' => 'required|email',
                     'password' => 'required|string|min:8',
-                    'first_name' => 'nullable|string|max:255',
-                    'last_name' => 'nullable|string|max:255',
+                    'first_name' => 'required|string|max:255',
+                    'last_name' => 'required|string|max:255',
                 ]);
     
                 if ($existingEmployee->email_address && $existingEmployee->email_address !== $request->email_address) {

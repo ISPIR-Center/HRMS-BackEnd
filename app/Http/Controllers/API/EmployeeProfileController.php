@@ -60,9 +60,20 @@ class EmployeeProfileController extends Controller
 
     public function ViewList(): JsonResponse
     {
-        $employees = Employee::with(['employmentType', 'classification', 'office', 'ipcrs'])->get();
-
-        return response()->json($employees);
+        try {
+            $employees = Employee::with(['employmentType', 'classification', 'office', 'ipcrs'])->get();
+    
+            return response()->json([
+                'success' => true,
+                'data' => $employees,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve employee list',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
 
@@ -100,12 +111,10 @@ class EmployeeProfileController extends Controller
                 'employee_no' => 'required|string|unique:employees,employee_no,' . $employee_no . ',employee_no',
             ]);
 
-            // Update employee_no if changed
             if ($request->filled('employee_no') && $request->employee_no !== $employee_no) {
                 $employee->employee_no = $validatedData['employee_no'];
             }
 
-            // Update related fields
             $employee->update($validatedData);
 
             if ($request->filled('employment_type_id')) {
@@ -139,18 +148,19 @@ class EmployeeProfileController extends Controller
     public function UpdateEmployee(Request $request, $employee_no): JsonResponse
     {
         try {
-            $authEmployee = auth()->user(); 
+            // $authEmployee = auth()->user(); 
             
-            if ($authEmployee->employee_no !== $employee_no) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized: You can only update your own profile'
-                ], 403);
-            }
+            // if ($authEmployee->employee_no !== $employee_no) {
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => 'Unauthorized: You can only update your own profile'
+            //     ], 403);
+            // }
 
-            $employee = Employee::findOrFail($employee_no);
+            $employee = Employee::where('employee_no', $employee_no)->firstOrFail();
 
             $validatedData = $request->validate([
+                'employee_no' => 'required|string|unique:employees,employee_no,' . $employee->employee_no . ',employee_no',
                 'employment_type_id' => 'nullable|exists:employment_types,id',
                 'classification_id' => 'nullable|exists:employee_classifications,id',
                 'office_id' => 'nullable|exists:offices,id',
@@ -158,12 +168,23 @@ class EmployeeProfileController extends Controller
                 'first_name' => 'required|string|max:255',
                 'middle_name' => 'nullable|string|max:255',
                 'last_name' => 'required|string|max:255',
-                'email_address' => 'required|email|unique:employees,email_address,' . $employee_no . ',employee_no',
+                'email_address' => 'required|email|unique:employees,email_address,' . $employee->employee_no . ',employee_no',
                 'mobile_no' => 'nullable|string',
                 'birthdate' => 'nullable|date',
                 'gender' => 'nullable|in:Male,Female',
                 'google_scholar_link' => 'nullable|url',
             ]);
+
+            if ($request->has('employee_no') && $employee->employee_no !== $validatedData['employee_no']) {
+                if (Employee::where('employee_no', $validatedData['employee_no'])->exists()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The new employee number is already taken.',
+                    ], 409);
+                }
+
+                $employee->employee_no = $validatedData['employee_no'];
+            }
 
             $employee->update($validatedData);
 
@@ -176,6 +197,7 @@ class EmployeeProfileController extends Controller
             if ($request->filled('office_id')) {
                 $employee->office()->associate($request->office_id);
             }
+
             $employee->save();
 
             return response()->json([
@@ -193,13 +215,106 @@ class EmployeeProfileController extends Controller
         }
     }
 
-    
 }
 
 
 
 
 
+// public function UpdateEmployee(Request $request, $employee_no): JsonResponse
+// {
+//     try {
+//         $authEmployee = auth()->user(); 
+
+//         // Check if the authenticated user is trying to update their own profile (User profile update)
+//         if ($authEmployee->employee_no !== $employee_no) {
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Unauthorized: You can only update your own profile'
+//             ], 403);
+//         }
+
+//         return $this->updateEmployeeProfile($request, $employee_no);
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'success' => false,
+//             'error' => 'Something went wrong',
+//             'message' => $e->getMessage()
+//         ], 500);
+//     }
+// }
+
+// public function UpdateProfile(Request $request, $employee_no): JsonResponse
+// {
+//     try {
+//         return $this->updateEmployeeProfile($request, $employee_no);
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'success' => false,
+//             'error' => 'Something went wrong',
+//             'message' => $e->getMessage(),
+//         ], 500);
+//     }
+// }
+
+// private function updateEmployeeProfile(Request $request, $employee_no): JsonResponse
+// {
+//     $employee = Employee::findOrFail($employee_no);
+
+//     // Validate the incoming request data, including the employee_no
+//     $validatedData = $request->validate([
+//         'employee_no' => 'required|string|unique:employees,employee_no,' . $employee_no . ',employee_no',
+//         'employment_type_id' => 'nullable|exists:employment_types,id',
+//         'classification_id' => 'nullable|exists:employee_classifications,id',
+//         'office_id' => 'nullable|exists:offices,id',
+//         'suffix' => 'nullable|string',
+//         'first_name' => 'required|string|max:255',
+//         'middle_name' => 'nullable|string|max:255',
+//         'last_name' => 'required|string|max:255',
+//         'email_address' => 'nullable|email|unique:employees,email_address,' . $employee_no . ',employee_no',
+//         'mobile_no' => 'nullable|string',
+//         'birthdate' => 'nullable|date',
+//         'gender' => 'nullable|in:Male,Female',
+//         'google_scholar_link' => 'nullable|url',
+//     ]);
+
+//     // Update employee_no if provided and different
+//     if ($request->filled('employee_no') && $request->employee_no !== $employee_no) {
+//         // Ensure the new employee_no is unique
+//         if (Employee::where('employee_no', $validatedData['employee_no'])->exists()) {
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'The new employee number is already taken.',
+//             ], 409);
+//         }
+
+//         // Update employee_no
+//         $employee->employee_no = $validatedData['employee_no'];
+//     }
+
+//     // Update the employee record with validated data
+//     $employee->update($validatedData);
+
+//     // If related fields are provided, update relationships
+//     if ($request->filled('employment_type_id')) {
+//         $employee->employmentType()->associate($request->employment_type_id);
+//     }
+//     if ($request->filled('classification_id')) {
+//         $employee->classification()->associate($request->classification_id);
+//     }
+//     if ($request->filled('office_id')) {
+//         $employee->office()->associate($request->office_id);
+//     }
+
+//     // Save the updated employee
+//     $employee->save();
+
+//     return response()->json([
+//         'success' => true,
+//         'message' => 'Employee updated successfully',
+//         'data' => $employee->load(['employmentType', 'classification', 'office']),
+//     ], 200);
+// }
 
 
 
@@ -207,42 +322,3 @@ class EmployeeProfileController extends Controller
 
 
 
-// public function updateEmployee(Request $request, $employee_no): JsonResponse
-    // {
-    //     try {
-    //         $employee = Employee::findOrFail($employee_no);
-
-    //         $validatedData = $request->validate([
-    //             'employment_type_id' => 'nullable|exists:employment_types,id',
-    //             'classification_id' => 'nullable|exists:employee_classifications,id',
-    //             'office_id' => 'nullable|exists:offices,id',
-    //             'suffix' => 'nullable|string',
-    //             'first_name' => 'required|string|max:255',
-    //             'middle_name' => 'nullable|string|max:255',
-    //             'last_name' => 'required|string|max:255',
-    //             'email_address' => 'required|email|unique:employees,email_address,' . $employee_no . ',employee_no',
-    //             'mobile_no' => 'nullable|string',
-    //             'birthdate' => 'nullable|date',
-    //             'gender' => 'nullable|in:Male,Female',
-    //             'google_scholar_link' => 'nullable|url',
-    //         ]);
-
-    //         $employee->update($validatedData);
-
-    //         if ($request->has('employment_type_id')) {
-    //             $employee->employmentType()->associate($request->employment_type_id);
-    //         }
-
-    //         if ($request->has('classification_id')) {
-    //             $employee->classification()->associate($request->classification_id);
-    //         }
-
-    //         if ($request->has('office_id')) {
-    //             $employee->office()->associate($request->office_id);
-    //         }
-
-    //         return response()->json($employee->load(['employmentType', 'classification', 'office']), 200);
-    //     } catch (\Exception $e) {
-    //         return response()->json(['error' => 'Something went wrong', 'message' => $e->getMessage()], 500);
-    //     }
-    // }
