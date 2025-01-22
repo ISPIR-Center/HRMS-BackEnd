@@ -14,13 +14,24 @@ class EmployeeMiddleware
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next)
-    {
-        if (Auth::check() && Auth::user()->role === 'employee') {
-            return $next($request); 
-        }
+    // public function handle(Request $request, Closure $next)
+    // {
+    //     if (Auth::check() && Auth::user()->role === 'employee') {
+    //         return $next($request); 
+    //     }
 
       
-        return response()->json(['message' => 'Unauthorized. Employees only.'], 403);
+    //     return response()->json(['message' => 'Unauthorized. Employees only.'], 403);
+    // }
+
+    public function handle(Request $request, Closure $next)
+    {
+        $user = auth()->user();
+
+        if ($user->role !== 'employee') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        return $next($request);
     }
 }

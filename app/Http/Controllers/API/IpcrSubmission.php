@@ -3,13 +3,14 @@
 namespace App\Http\Controllers\API;
 
 use App\Models\Ipcr;
+use App\Models\User;
 use App\Models\IpcrPeriod;
 use Illuminate\Http\Request;
-use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Validator;
-use App\Models\User;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule; 
+use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 
 
@@ -220,61 +221,6 @@ class IpcrSubmission extends Controller
          return 'Poor';
      }
 
-
-    public function IpcrList(Request $request)
-    {
-         try {
-             $user = Auth::user();
- 
-             if ($user->role === 'admin') {
-                 $ipcrs = Ipcr::with(['employee', 'submittedBy', 'validatedBy', 'period'])->get();
-             } else {
-                 $ipcrs = Ipcr::where('employee_no', $user->employee_no)
-                     ->with(['period'])
-                     ->get();
-             }
-
-
-             $formattedIpcrs = $ipcrs->map(function ($ipcr) {
-                return [
-               
-                    'id' => $ipcr->id,
-                    'employee_no' => $ipcr->employee_no,
-                    'employee_name' => optional($ipcr->employee, fn($e) => $e->first_name . ' ' . $e->last_name) ?? 'Null',
-                    // 'employee_name' => optional($ipcr->employee) ? $ipcr->employee->first_name . ' ' . $ipcr->employee->last_name : 'N/A',
-                    'numerical_rating' => $ipcr->numerical_rating,
-                    'adjectival_rating' => $ipcr->adjectival_rating,
-                    'submitted_date' => $ipcr->submitted_date,
-                    'validated_date' => $ipcr->validated_date,
-                    // classes from model submittedBy validatedBy
-                    // 'submitted_by' => optional($ipcr->submittedBy?->employee)->first_name ?? 'N/A',
-                    'submitted_by' => optional($ipcr->submittedBy)->employee_no ?? 'N/A',
-                    'validated_by' => optional($ipcr->validatedBy)->employee_no ?? 'N/A',
-                    'file_path' => $ipcr->file_path,
-                    'status' => $ipcr->status,
-                    'ipcr_period' => [
-                        'type' => optional($ipcr->period)->ipcr_type,
-                        'start_date' => optional($ipcr->period)->start_month_year,
-                        'end_date' => optional($ipcr->period)->end_month_year,
-                    ],
-                ];
-            });
-             return response()->json([
-                 'success' => true,
-                 'message' => 'IPCR records retrieved successfully.',
-                //  'data' => $ipcrs
-                'data'=> $formattedIpcrs
-             ], 200);
-         } catch (\Exception $e) {
-             return response()->json([
-                 'success' => false,
-                 'message' => 'Something went wrong.',
-                 'error' => $e->getMessage()
-             ], 500);
-         }
-    }
-
-
     public function GetIpcr($id)
     {
         try {
@@ -369,6 +315,125 @@ class IpcrSubmission extends Controller
             ], 500);
         }
     }
+
+    // public function IpcrList(Request $request)
+    // {
+    //      try {
+    //          $user = Auth::user();
+ 
+    //          if ($user->role === 'admin') {
+    //              $ipcrs = Ipcr::with(['employee', 'submittedBy', 'validatedBy', 'period'])->get();
+    //          } else {
+    //              $ipcrs = Ipcr::where('employee_no', $user->employee_no)
+    //                  ->with(['period'])
+    //                  ->get();
+    //          }
+
+
+    //          $formattedIpcrs = $ipcrs->map(function ($ipcr) {
+    //             return [
+               
+    //                 'id' => $ipcr->id,
+    //                 'employee_no' => $ipcr->employee_no,
+    //                 'employee_name' => optional($ipcr->employee, fn($e) => $e->first_name . ' ' . $e->last_name) ?? 'Null',
+    //                 // 'employee_name' => optional($ipcr->employee) ? $ipcr->employee->first_name . ' ' . $ipcr->employee->last_name : 'N/A',
+    //                 'numerical_rating' => $ipcr->numerical_rating,
+    //                 'adjectival_rating' => $ipcr->adjectival_rating,
+    //                 'submitted_date' => $ipcr->submitted_date,
+    //                 'validated_date' => $ipcr->validated_date,
+    //                 // classes from model submittedBy validatedBy
+    //                 // 'submitted_by' => optional($ipcr->submittedBy?->employee)->first_name ?? 'N/A',
+    //                 'submitted_by' => optional($ipcr->submittedBy)->employee_no ?? 'N/A',
+    //                 'validated_by' => optional($ipcr->validatedBy)->employee_no ?? 'N/A',
+    //                 'file_path' => $ipcr->file_path,
+    //                 'status' => $ipcr->status,
+    //                 'ipcr_period' => [
+    //                     'type' => optional($ipcr->period)->ipcr_type,
+    //                     'start_date' => optional($ipcr->period)->start_month_year,
+    //                     'end_date' => optional($ipcr->period)->end_month_year,
+    //                 ],
+    //             ];
+    //         });
+    //          return response()->json([
+    //              'success' => true,
+    //              'message' => 'IPCR records retrieved successfully.',
+    //             //  'data' => $ipcrs
+    //             'data'=> $formattedIpcrs
+    //          ], 200);
+    //      } catch (\Exception $e) {
+    //          return response()->json([
+    //              'success' => false,
+    //              'message' => 'Something went wrong.',
+    //              'error' => $e->getMessage()
+    //          ], 500);
+    //      }
+    // }
+
+    public function IpcrList(Request $request)
+    {
+        try {
+           $perPage = $request->get('per_page', 20);
+
+            $user = Auth::user();
+
+            if ($user->role === 'admin') {
+                $ipcrs = Ipcr::with([
+                    'employee:id,first_name,last_name', 
+                    'submittedBy:id,employee_no', 
+                    'validatedBy:id,employee_no', 
+                    'period:id,ipcr_type,start_month_year,end_month_year'
+                ])->paginate($perPage);
+            } else {
+                $ipcrs = Ipcr::where('employee_no', $user->employee_no)
+                    ->with(['period:id,ipcr_type,start_month_year,end_month_year'])
+                    ->paginate($perPage);
+            }
+
+            $formattedIpcrs = $ipcrs->map(function ($ipcr) {
+                return [
+                    'id' => $ipcr->id,
+                    'employee_no' => $ipcr->employee_no,
+                    'employee_name' => optional($ipcr->employee, fn($e) => $e->first_name . ' ' . $e->last_name) ?? 'Null',
+                    'numerical_rating' => $ipcr->numerical_rating,
+                    'adjectival_rating' => $ipcr->adjectival_rating,
+                    'submitted_date' => $ipcr->submitted_date,
+                    'validated_date' => $ipcr->validated_date,
+                    'submitted_by' => optional($ipcr->submittedBy)->employee_no ?? 'N/A',
+                    'validated_by' => optional($ipcr->validatedBy)->employee_no ?? 'N/A',
+                    'file_path' => $ipcr->file_path,
+                    'status' => $ipcr->status,
+                    'ipcr_period' => [
+                        'type' => optional($ipcr->period)->ipcr_type,
+                        'start_date' => optional($ipcr->period)->start_month_year,
+                        'end_date' => optional($ipcr->period)->end_month_year,
+                    ],
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'IPCR records retrieved successfully.',
+                'data' => $formattedIpcrs,
+                'pagination' => [
+                'current_page' => $ipcrs->currentPage(),
+                'per_page' => $ipcrs->perPage(),
+                'total' => $ipcrs->total(),
+                'next_page_url' => $ipcrs->nextPageUrl(),
+                'prev_page_url' => $ipcrs->previousPageUrl(),
+                'last_page' => $ipcrs->lastPage(),
+                'to' => $ipcrs->lastItem(),
+            ]
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('IPCR List error: '.$e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 
 }
 

@@ -37,7 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::controller(EmployeeProfileController::class)->middleware('employee')->group(function () { 
-        Route::get('/employees/profile/view/{employee_no}',  'ViewProfile');
+        Route::get('/employees/profile/view/{employee_no}',  'ViewEmployeeProfile');
         Route::put('/employees/profile/update/{employee_no}',  'UpdateEmployee');
     });
 

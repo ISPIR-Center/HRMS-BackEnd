@@ -148,14 +148,14 @@ class EmployeeProfileController extends Controller
     public function UpdateEmployee(Request $request, $employee_no): JsonResponse
     {
         try {
-            // $authEmployee = auth()->user(); 
+            $authEmployee = auth()->user(); 
             
-            // if ($authEmployee->employee_no !== $employee_no) {
-            //     return response()->json([
-            //         'success' => false,
-            //         'message' => 'Unauthorized: You can only update your own profile'
-            //     ], 403);
-            // }
+            if ($authEmployee->employee_no !== $employee_no) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized: You can only update your own profile'
+                ], 403);
+            }
 
             $employee = Employee::where('employee_no', $employee_no)->firstOrFail();
 
@@ -212,6 +212,26 @@ class EmployeeProfileController extends Controller
                 'error' => 'Something went wrong',
                 'message' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function ViewEmployeeProfile($employee_no): JsonResponse
+    {
+        try {
+            $employee = Employee::with(['employmentType', 'classification', 'office'])
+                                ->where('employee_no', $employee_no) 
+                                ->firstOrFail();
+
+            if (auth()->user()->employee_no !== $employee_no) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized: You can only view your own profile.',
+                ], 403);
+            }
+
+            return response()->json($employee, 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Employee not found', 'message' => $e->getMessage()], 404);
         }
     }
 
