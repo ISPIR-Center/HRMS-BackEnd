@@ -21,6 +21,7 @@ return new class extends Migration
             $table->unsignedBigInteger('office_id')->nullable();
             $table->foreign('office_id')->references('id')->on('offices')->onUpdate('cascade')->onDelete('set null');
 
+            $table->string('designation')->nullable();
             $table->string('suffix')->nullable();            
             $table->string('first_name');                    
             $table->string('middle_name')->nullable();       

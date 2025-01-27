@@ -29,6 +29,7 @@ class EmployeeProfileController extends Controller
                 'birthdate' => 'nullable|date',
                 'gender' => 'nullable|string|in:Male,Female',
                 'google_scholar_link' => 'nullable|url',
+                'designation' => 'nullable|string|max:255', 
             ]);
 
             $employee = Employee::create($validatedData);
@@ -109,6 +110,7 @@ class EmployeeProfileController extends Controller
                 'gender' => 'nullable|in:Male,Female',
                 'google_scholar_link' => 'nullable|url',
                 'employee_no' => 'required|string|unique:employees,employee_no,' . $employee_no . ',employee_no',
+                'designation' => 'nullable|string|max:255', 
             ]);
 
             if ($request->filled('employee_no') && $request->employee_no !== $employee_no) {
@@ -173,6 +175,7 @@ class EmployeeProfileController extends Controller
                 'birthdate' => 'nullable|date',
                 'gender' => 'nullable|in:Male,Female',
                 'google_scholar_link' => 'nullable|url',
+                'designation' => 'nullable|string|max:255', 
             ]);
 
             if ($request->has('employee_no') && $employee->employee_no !== $validatedData['employee_no']) {
