@@ -27,6 +27,7 @@ class Employee extends Model
         'birthdate',
         'gender',
         'google_scholar_link',
+        'designation'
     ];
 
     public function employmentType()

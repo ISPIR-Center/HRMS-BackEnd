@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             
-            $table->string('employee_no')->unique();
+            $table->string('employee_no')->nullable();
             $table->foreign('employee_no')->references('employee_no')->on('employees')->onUpdate('cascade')->onDelete('set null');
             // $table->enum('role', ['employee', 'admin'])->default('employee');
 

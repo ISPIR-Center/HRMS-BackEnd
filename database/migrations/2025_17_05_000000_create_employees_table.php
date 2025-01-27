@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
-            $table->string('employee_no')->primary();
+            $table->string('employee_no')->unique();
 
             $table->unsignedBigInteger('employment_type_id')->nullable();
             $table->foreign('employment_type_id')->references('id')->on('employment_types')->onUpdate('cascade')->onDelete('set null');
@@ -31,6 +31,7 @@ return new class extends Migration
             $table->date('birthdate')->nullable();
             $table->string('gender')->nullable();
             $table->string('google_scholar_link')->nullable();
+
 
             $table->timestamps();
         });
