@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API;
 
+use Carbon\Carbon;
 use App\Models\Office;
 use App\Models\Employee;
 use App\Models\IpcrPeriod;
@@ -12,60 +13,42 @@ use App\Models\EmployeeClassification;
 
 class DetailsController extends Controller
 {
+    // Employee Classifications Dropdown
     public function getEmployeeClassifications()
     {
         $classifications = EmployeeClassification::all();
-
-        $formattedClassifications = $classifications->map(function ($classification) {
-            return [ 
-                'id' => $classification->id,
-                'classification' => $classification->classification,
-            ];
-        });
-
         return response()->json([
             'success' => true,
-            'data' => $formattedClassifications,
+            'data' => $classifications,
         ], 200);
     }
 
+    // Employment Types Dropdown
     public function getEmploymentTypes()
     {
         $employmentTypes = EmploymentType::all();
 
-        $formattedEmploymentType = $employmentTypes->map(function ($employmentType) {
-            return [ 
-                'id' => $employmentType->id,
-                'employment_type' => $employmentType->employment_type,
-            ];
-        });
+       
 
         return response()->json([
             'success' => true,
-            // 'data' => $employmentTypes,
-            'data' => $formattedEmploymentType,
+            'data' => $employmentTypes,
         ], 200);
     }
 
+    // Offices Dropdown
     public function getOffices()
     {
         $offices = Office::all();
 
-        $formattedOffices = $offices->map(function ($office) {
-            return [ 
-                'id' => $office->id,
-                'office_name' => $office->office_name,
-                'office_description' => $office->office_description,
-            ];
-        });
 
         return response()->json([
             'success' => true,
-            'data' => $formattedOffices,
+            "data" => $offices,
         ], 200);
     }
 
-
+    // IPCR Periods Dropdown
     public function getIpcrPeriods()
     {
         try {
@@ -74,9 +57,17 @@ class DetailsController extends Controller
                 ->get();
 
             $formattedPeriods = $ipcrPeriods->map(function ($period) {
+
+                $startMonth = Carbon::parse($period->start_month_year)->format('F-Y'); 
+                $endMonth = Carbon::parse($period->end_month_year)->format('F-Y'); 
+                
                 return [
                     'id' => $period->id, 
-                    'name' => $period->ipcr_period_type . ' - ' . $period->ipcr_type,
+                    // 'name' => $period->ipcr_period_type . ' - ' . $period->ipcr_type,
+                    'ipcr_period_type' => $period->ipcr_period_type,
+                    'ipcr_type' => $period->ipcr_type, 
+                    'period' => $startMonth . ' - ' . $endMonth,
+
                 ];
             });
 
@@ -121,25 +112,5 @@ class DetailsController extends Controller
     
 
 }
-// public function AutoSuggestEmployee(Request $request)
-// {
-//     try {
-//         $searchTerm = $request->input('search_name');
-//         $employees = Employee::where('first_name', 'like', "%{$searchTerm}%")
-//                             ->orWhere('last_name', 'like', "%{$searchTerm}%")
-//                             ->select('first_name', 'last_name', 'employee_no')
-//                             ->get();
 
-//         return response()->json([
-//             'success' => true,
-//             'data' => $employees
-//         ]);
-//     } catch (\Exception $e) {
-//         return response()->json([
-//             'success' => false,
-//             'message' => 'Something went wrong.',
-//             'error' => $e->getMessage()
-//         ], 500);
-//     }
-// }
 

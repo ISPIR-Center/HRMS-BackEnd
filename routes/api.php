@@ -28,7 +28,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/employment-type/dropdown',  'getEmploymentTypes');
         Route::get('/offices/dropdown',  'getOffices');
 
-
         Route::get('/ipcr-periods/active-flags/dropdown',  'getIpcrPeriods');
         Route::post('/employee-names/autosuggestions/input-search',  'AutoSuggestEmployee')->middleware('admin');
     });
@@ -64,6 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
         Route::post('/employee-ipcr/submit',  'EmployeeIpcrSubmit')->middleware('employee');
+        // List of IPCR Admin and User Funtion
         Route::get('/ipcr-list/view',  'IpcrList');
     });
 

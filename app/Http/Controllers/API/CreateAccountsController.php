@@ -11,6 +11,7 @@ use Illuminate\Validation\ValidationException;
 
 class CreateAccountsController extends Controller
 {
+    // Create User Account for Employee Admin function
     public function AdminCreateAccount(Request $request)
     {
         try {
@@ -85,6 +86,8 @@ class CreateAccountsController extends Controller
         }
     }
 
+    
+    // Create account public function
     public function CreateAccount(Request $request)
     {
         try {

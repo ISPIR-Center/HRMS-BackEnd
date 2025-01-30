@@ -6,6 +6,7 @@ use App\Models\IpcrPeriod;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Validation\ValidationException;
+use Carbon\Carbon;
 
 class IpcrPeriodController extends Controller
 {
@@ -62,15 +63,33 @@ class IpcrPeriodController extends Controller
             ], 500);
         }
     }
+    
 
     public function ListIpcrPeriod()
     {
         try {
             $ipcrPeriods = IpcrPeriod::orderBy('start_month_year', 'desc')->get();
+            
+            // Format the dates before returning
+            $formattedPeriods = $ipcrPeriods->map(function ($period) {
+                $startMonth = Carbon::parse($period->start_month_year)->format('F'); // Full month name
+                $endMonth = Carbon::parse($period->end_month_year)->format('F'); // Full month name
+                $year = Carbon::parse($period->start_month_year)->format('Y'); // Year
+
+                return [
+                    'id' => $period->id,
+                    'period' => "$startMonth - $endMonth $year",
+                    'ipcr_period_type' => $period->ipcr_period_type,
+                    'ipcr_type' => $period->ipcr_type,
+                    'active_flag' => $period->active_flag,
+                    // 'created_at' => Carbon::parse($period->created_at)->format('Y-m-d H:i:s'),
+                    // 'updated_at' => Carbon::parse($period->updated_at)->format('Y-m-d H:i:s'),
+                ];
+            });
 
             return response()->json([
                 'success' => true,
-                'data' => $ipcrPeriods
+                'data' => $formattedPeriods
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -80,6 +99,7 @@ class IpcrPeriodController extends Controller
             ], 500);
         }
     }
+
 
     public function GetIpcrPeriod($id)
     {

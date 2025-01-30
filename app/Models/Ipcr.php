@@ -42,4 +42,8 @@ class Ipcr extends Model
         return $this->belongsTo(User::class, 'validated_by');
     }
 
+    public function getFileUrlAttribute()
+    {
+        return $this->file_path ? asset('storage/' . $this->file_path) : null;
+    }
 }
