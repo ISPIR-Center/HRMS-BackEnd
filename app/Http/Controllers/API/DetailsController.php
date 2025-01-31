@@ -36,7 +36,7 @@ class DetailsController extends Controller
         ], 200);
     }
 
-    // Offices Dropdown
+    // Offices Dropdown for create employee profile
     public function getOffices()
     {
         $offices = Office::all();
@@ -47,6 +47,32 @@ class DetailsController extends Controller
             "data" => $offices,
         ], 200);
     }
+
+
+    // Dynamic Dropdown for Employees filterred by Office
+    //  Offices with Employees
+    public function getOfficesfilter()
+    {
+        $offices = Office::with ('employee')->get();
+
+
+        return response()->json([
+            'success' => true,
+            "data" => $offices,
+        ], 200);
+    }
+
+    // Fetch employees for the selected office
+    public function getEmployeesByOffice($officeId)
+    {
+        $employees = Employee::where('office_id', $officeId)->get();
+    
+        return response()->json([
+            'success' => true,
+            'data' => $employees,
+        ], 200);
+    }
+
 
     // IPCR Periods Dropdown
     public function getIpcrPeriods()
